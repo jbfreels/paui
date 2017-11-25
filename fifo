@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+# fifo.sh -- Sets up initial Archlinux environment on the specified
+# device.
+#
+# Usage: fifo.sh <DEV> <WIFI_SSID> <WIFI_PASS> 
+#
+# (C) Copyright 2017, JB Freels <jbfreels@me.com>
+#
+
+set -exu
+
+DEV=$1
+WIFI_SSID=$2
+WIFI_PASS=$3
+
+cd $(mktemp -d)
+
+function umountboot {
+    umount boot || true
+    umount root || true
+}
+
+# RPi1/Zero/W (armv6h):
+archlinux=/tmp/ArchLinuxARM-rpi-latest.tar.gz
+url=http://os.archlinuxarm.org/os/ArchLinuxARM-rpi-latest.tar.gz
+
+# RPi2 (armv7h):
+# archlinux=/tmp/ArchLinuxARM-rpi-2-latest.tar.gz
+# url=http://os.archlinuxarm.org/os/ArchLinuxARM-rpi-2-latest.tar.gz
+
+curl -L -o $archlinux -z $archlinux $url
+parted -s $DEV mklabel msdos
+parted -s $DEV mkpart primary fat32 1 128
+parted -s $DEV mkpart primary ext4 128 -- -1
+mkfs.vfat ${DEV}1
+mkfs.ext4 -F ${DEV}2
+mkdir -p boot
+
+mount ${DEV}1 boot
+trap umountboot EXIT
+mkdir -p root
+mount ${DEV}2 root
+
+bsdtar -xpf $archlinux -C root
+sync
+mv root/boot/* boot
+
+cat << EOF >> root/etc/systemd/network/wlan0.network
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+EOF
+
+wpa_passphrase "${WIFI_SSID}" "${WIFI_PASS}" > root/etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+
+ln -s \
+   /usr/lib/systemd/system/wpa_supplicant@.service \
+   root/etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service
