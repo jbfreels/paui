@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# lilo.sh -- Installs additional packages.
+#
+# Usage: lilo
+#
+# Copyright (c) 2017 J.B. Freels <jbfreels@me.com>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+if [[ -f `pwd`/sharedfuncs ]]; then
+  source sharedfuncs
+else
+  echo "missing file: sharedfuncs"
+  exit 1
+fi
+
+PAUI_TITLE="Raspberri Pi Archlinux Ultimate Install"
+PAUI_URL="https://github.com/jbfreels/paui"
+
+welcome () {
+  clear
+  echo -e "${Bold}$PAUI_TITLE${White}"
+  print_line
+  echo "Requirements:"
+  echo "-> Run script as root user"
+  echo "-> Working internet connection"
+  print_line
+  echo "Cancel any time with CTRL-C"
+  print_line
+  echo "$PAUI_URL"
+  pause_function
+  echo ""
+}
+
+function select_editor() {
+  print_title "Default Editor"
+  editor_list=("emacs" "nano" "vi" "vim" "neovim" "zile");
+  PS3="$prompt1"
+  echo -e "Select editor\n"
+  select EDITOR in "${editors_list[@]}"; do
+    if contains_element "$EDITOR" "${editor_list[@]}"; then
+      package_install "$EDITOR"
+      break
+    else
+      invalid_option
+    fi
+  done
+}
+
+configure_hostname () {
+  read -p "Hostname (archlinux): " host_name
+  echo "$host_name" > root/etc/hostname
+}
+
+install_kodi () {
+  print_title "KODI-RBP"
+  print_info "A software media player and entertainment hub for digital media (Raspberry Pi)"
+  package_install "kodi-rbp"
+}
+function finish() {
+  print_title "INSTALL COMPLETE"
+  echo -e "Thanks for using ${PAUI_TITLE} :)"
+  read -p "Reboot [y/N]: " OPTION
+  [[ $OPTION == y ]] && reboot
+  exit 0
+}
+
+welcome
+
+while true
+do
+  print_title "$PAUI_TITLE -- $PAUI_URL"
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Kodi")"
+  echo ""
+  echo " q) Quit"
+  echo ""
+  MAINMENU+=" q"
+  read_input_options "$MAINMENU"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in 
+      1)
+        install_kodi
+        checklist[1]=1
+        ;;
+      "q")
+        finish
+        ;;
+      *)
+        invalid_option
+        ;;
+
+    esac
+  done
+done
